@@ -7,6 +7,8 @@
   body { font-family: sans-serif; text-align: center; background: #f7f7f7; }
   .card { background: white; margin: 40px auto; padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 0 10px #ccc; }
   #barcode { margin: 20px 0; }
+  input { padding: 8px; margin: 5px; width: 200px; }
+  button { padding: 8px 20px; margin-top: 10px; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
@@ -16,11 +18,14 @@
 </head>
 <body>
 <h2>Myポイントカード</h2>
+
 <div id="loginDiv">
-  <input type="email" id="email" placeholder="メール">
-  <input type="password" id="password" placeholder="パスワード">
+  <input type="email" id="email" placeholder="メール"><br>
+  <input type="password" id="password" placeholder="パスワード"><br>
   <button id="loginBtn">ログイン / 登録</button>
+  <p id="loginMsg" style="color:red"></p>
 </div>
+
 <div id="cardDiv" style="display:none" class="card">
   <svg id="barcode"></svg>
   <h3 id="points">ポイント: 0</h3>
@@ -28,13 +33,33 @@
 </div>
 
 <script>
-document.getElementById("loginBtn").onclick = async ()=>{
-  const email = email.value, password = password.value;
+const loginBtn = document.getElementById("loginBtn");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const loginMsg = document.getElementById("loginMsg");
+
+loginBtn.onclick = async ()=>{
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
+  if (!email || !password) {
+    loginMsg.textContent = "メールとパスワードを入力してください";
+    return;
+  }
+  loginMsg.textContent = "";
   try {
     await auth.signInWithEmailAndPassword(email, password);
-  } catch {
-    await auth.createUserWithEmailAndPassword(email, password);
-    await db.collection("users").doc(email).set({ points: 0 });
+  } catch (error) {
+    if (error.code === "auth/user-not-found") {
+      // 新規登録
+      try {
+        await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection("users").doc(email).set({ points: 0 });
+      } catch (e) {
+        loginMsg.textContent = "登録エラー: " + e.message;
+      }
+    } else {
+      loginMsg.textContent = "ログインエラー: " + error.message;
+    }
   }
 };
 
@@ -42,9 +67,16 @@ auth.onAuthStateChanged(async user=>{
   if (user) {
     loginDiv.style.display = "none";
     cardDiv.style.display = "block";
-    JsBarcode("#barcode", user.email, { format: "CODE128", width:2, height:60 });
+
+    JsBarcode("#barcode", user.email, { format: "CODE128", width: 2, height: 60 });
+
     const doc = await db.collection("users").doc(user.email).get();
-    points.innerText = `ポイント: ${doc.data().points}`;
+    if (doc.exists) {
+      points.textContent = `ポイント: ${doc.data().points}`;
+    } else {
+      await db.collection("users").doc(user.email).set({ points: 0 });
+      points.textContent = "ポイント: 0";
+    }
   } else {
     loginDiv.style.display = "block";
     cardDiv.style.display = "none";
