@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Myポイントカード</title>
+<style>
+  body { font-family: sans-serif; text-align: center; background: #f7f7f7; }
+  .card { background: white; margin: 40px auto; padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 0 10px #ccc; }
+  #barcode { margin: 20px 0; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="firebase.js"></script>
+</head>
+<body>
+<h2>Myポイントカード</h2>
+<div id="loginDiv">
+  <input type="email" id="email" placeholder="メール">
+  <input type="password" id="password" placeholder="パスワード">
+  <button id="loginBtn">ログイン / 登録</button>
+</div>
+<div id="cardDiv" style="display:none" class="card">
+  <svg id="barcode"></svg>
+  <h3 id="points">ポイント: 0</h3>
+  <button id="logoutBtn">ログアウト</button>
+</div>
+
+<script>
+document.getElementById("loginBtn").onclick = async ()=>{
+  const email = email.value, password = password.value;
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch {
+    await auth.createUserWithEmailAndPassword(email, password);
+    await db.collection("users").doc(email).set({ points: 0 });
+  }
+};
+
+auth.onAuthStateChanged(async user=>{
+  if (user) {
+    loginDiv.style.display = "none";
+    cardDiv.style.display = "block";
+    JsBarcode("#barcode", user.email, { format: "CODE128", width:2, height:60 });
+    const doc = await db.collection("users").doc(user.email).get();
+    points.innerText = `ポイント: ${doc.data().points}`;
+  } else {
+    loginDiv.style.display = "block";
+    cardDiv.style.display = "none";
+  }
+});
+
+logoutBtn.onclick = ()=>auth.signOut();
+</script>
+</body>
+</html>
